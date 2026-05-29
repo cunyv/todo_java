@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p src/main/java/com/example/todo)",
+      "Bash(mkdir -p src/main/resources/templates)",
+      "Bash(mkdir -p src/main/resources/static)",
+      "Bash(mkdir -p src/test/java/com/example/todo)"
+    ]
+  }
+}

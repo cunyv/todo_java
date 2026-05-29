@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>看板 - 待办事项</title>
+    <link rel="stylesheet" th:href="@{/css/kanban.css}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+</head>
+<body>
+    <div class="app">
+        <!-- 顶部导航 -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📋 任务看板</h1>
+                <p>拖拽任务卡片来更新状态</p>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span class="stat-number" th:text="${totalCount}">0</span>
+                    <span class="stat-label">总任务</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 添加任务区域 -->
+        <div class="add-task-section">
+            <form th:action="@{/todos}" th:object="${newTodo}" method="post" class="add-task-form">
+                <div class="form-row">
+                    <input type="text" th:field="*{title}" placeholder="✨ 添加新任务..." required class="task-input">
+                    <button type="submit" class="btn-add">添加</button>
+                </div>
+                <input type="text" th:field="*{description}" placeholder="任务描述（可选）" class="desc-input">
+            </form>
+        </div>
+
+        <!-- 看板主体 -->
+        <div class="board">
+            <!-- 待开始列 -->
+            <div class="column" id="todo-column">
+                <div class="column-header todo-header">
+                    <div class="column-title">
+                        <span class="column-icon">📝</span>
+                        <h2>待开始</h2>
+                        <span class="task-count" th:text="${todoCount}">0</span>
+                    </div>
+                </div>
+                <div class="column-body" id="todo-tasks"
+                     ondrop="drop(event, 'TODO')"
+                     ondragover="allowDrop(event)"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)">
+                    <div th:each="task : ${todoTasks}"
+                         class="task-card"
+                         th:id="'task-' + ${task.id}"
+                         draggable="true"
+                         ondragstart="dragStart(event)"
+                         th:data-id="${task.id}"
+                         th:data-status="${task.status}">
+                        <div class="card-header">
+                            <h3 th:text="${task.title}">任务标题</h3>
+                            <div class="card-actions">
+                                <a th:href="@{/todos/{id}/edit(id=${task.id})}" class="btn-icon" title="编辑">✏️</a>
+                                <form th:action="@{/todos/{id}/delete(id=${task.id})}" method="post" class="inline-form">
+                                    <button type="submit" class="btn-icon btn-delete" title="删除" onclick="return confirm('确定删除？')">🗑️</button>
+                                </form>
+                            </div>
+                        </div>
+                        <p th:if="${task.description}" th:text="${task.description}" class="card-desc">任务描述</p>
+                        <div class="card-footer">
+                            <span class="card-time" th:text="${#temporals.format(task.createdAt, 'MM-dd HH:mm')}">创建时间</span>
+                        </div>
+                    </div>
+                    <div class="empty-state" th:if="${#lists.isEmpty(todoTasks)}">
+                        <span>📭</span>
+                        <p>暂无任务</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进行中列 -->
+            <div class="column" id="progress-column">
+                <div class="column-header progress-header">
+                    <div class="column-title">
+                        <span class="column-icon">🚀</span>
+                        <h2>进行中</h2>
+                        <span class="task-count" th:text="${inProgressCount}">0</span>
+                    </div>
+                </div>
+                <div class="column-body" id="progress-tasks"
+                     ondrop="drop(event, 'IN_PROGRESS')"
+                     ondragover="allowDrop(event)"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)">
+                    <div th:each="task : ${inProgressTasks}"
+                         class="task-card"
+                         th:id="'task-' + ${task.id}"
+                         draggable="true"
+                         ondragstart="dragStart(event)"
+                         th:data-id="${task.id}"
+                         th:data-status="${task.status}">
+                        <div class="card-header">
+                            <h3 th:text="${task.title}">任务标题</h3>
+                            <div class="card-actions">
+                                <a th:href="@{/todos/{id}/edit(id=${task.id})}" class="btn-icon" title="编辑">✏️</a>
+                                <form th:action="@{/todos/{id}/delete(id=${task.id})}" method="post" class="inline-form">
+                                    <button type="submit" class="btn-icon btn-delete" title="删除" onclick="return confirm('确定删除？')">🗑️</button>
+                                </form>
+                            </div>
+                        </div>
+                        <p th:if="${task.description}" th:text="${task.description}" class="card-desc">任务描述</p>
+                        <div class="card-footer">
+                            <span class="card-time" th:text="${#temporals.format(task.createdAt, 'MM-dd HH:mm')}">创建时间</span>
+                        </div>
+                    </div>
+                    <div class="empty-state" th:if="${#lists.isEmpty(inProgressTasks)}">
+                        <span>🎯</span>
+                        <p>暂无进行中的任务</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 已完成列 -->
+            <div class="column" id="done-column">
+                <div class="column-header done-header">
+                    <div class="column-title">
+                        <span class="column-icon">✅</span>
+                        <h2>已完成</h2>
+                        <span class="task-count" th:text="${doneCount}">0</span>
+                    </div>
+                </div>
+                <div class="column-body" id="done-tasks"
+                     ondrop="drop(event, 'DONE')"
+                     ondragover="allowDrop(event)"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)">
+                    <div th:each="task : ${doneTasks}"
+                         class="task-card completed"
+                         th:id="'task-' + ${task.id}"
+                         draggable="true"
+                         ondragstart="dragStart(event)"
+                         th:data-id="${task.id}"
+                         th:data-status="${task.status}">
+                        <div class="card-header">
+                            <h3 th:text="${task.title}">任务标题</h3>
+                            <div class="card-actions">
+                                <a th:href="@{/todos/{id}/edit(id=${task.id})}" class="btn-icon" title="编辑">✏️</a>
+                                <form th:action="@{/todos/{id}/delete(id=${task.id})}" method="post" class="inline-form">
+                                    <button type="submit" class="btn-icon btn-delete" title="删除" onclick="return confirm('确定删除？')">🗑️</button>
+                                </form>
+                            </div>
+                        </div>
+                        <p th:if="${task.description}" th:text="${task.description}" class="card-desc">任务描述</p>
+                        <div class="card-footer">
+                            <span class="card-time" th:text="${#temporals.format(task.createdAt, 'MM-dd HH:mm')}">创建时间</span>
+                        </div>
+                    </div>
+                    <div class="empty-state" th:if="${#lists.isEmpty(doneTasks)}">
+                        <span>🎉</span>
+                        <p>暂无已完成的任务</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>✨ 任务看板 - 拖拽任务卡片更新状态</p>
+        </footer>
+    </div>
+
+    <!-- 提示消息 -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let draggedElement = null;
+        let draggedTaskId = null;
+
+        // 开始拖拽
+        function dragStart(event) {
+            draggedElement = event.target.closest('.task-card');
+            draggedTaskId = draggedElement.dataset.id;
+            draggedElement.classList.add('dragging');
+
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', draggedTaskId);
+
+            // 延迟添加样式，避免拖拽时样式闪烁
+            setTimeout(() => {
+                draggedElement.style.opacity = '0.4';
+            }, 0);
+        }
+
+        // 允许放置
+        function allowDrop(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+        }
+
+        // 进入放置区域
+        function dragEnter(event) {
+            event.preventDefault();
+            const column = event.target.closest('.column-body');
+            if (column) {
+                column.classList.add('drag-over');
+            }
+        }
+
+        // 离开放置区域
+        function dragLeave(event) {
+            const column = event.target.closest('.column-body');
+            if (column && !column.contains(event.relatedTarget)) {
+                column.classList.remove('drag-over');
+            }
+        }
+
+        // 放置
+        function drop(event, newStatus) {
+            event.preventDefault();
+
+            const column = event.target.closest('.column-body');
+            if (column) {
+                column.classList.remove('drag-over');
+            }
+
+            if (draggedTaskId && draggedElement) {
+                // 检查是否是不同的状态
+                const oldStatus = draggedElement.dataset.status;
+                if (oldStatus !== newStatus) {
+                    updateTaskStatus(draggedTaskId, newStatus);
+                } else {
+                    // 恢复样式
+                    draggedElement.style.opacity = '1';
+                    draggedElement.classList.remove('dragging');
+                }
+            }
+
+            draggedElement = null;
+            draggedTaskId = null;
+        }
+
+        // 更新任务状态
+        function updateTaskStatus(taskId, newStatus) {
+            const formData = new FormData();
+            formData.append('status', newStatus);
+
+            fetch(`/todos/${taskId}/status`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ 任务状态已更新');
+                    // 刷新页面以更新看板
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    showToast('❌ 更新失败: ' + data.message);
+                    // 恢复样式
+                    if (draggedElement) {
+                        draggedElement.style.opacity = '1';
+                        draggedElement.classList.remove('dragging');
+                    }
+                }
+            })
+            .catch(error => {
+                showToast('❌ 更新失败');
+                console.error('Error:', error);
+                // 恢复样式
+                if (draggedElement) {
+                    draggedElement.style.opacity = '1';
+                    draggedElement.classList.remove('dragging');
+                }
+            });
+        }
+
+        // 显示提示消息
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 拖拽结束时清理
+        document.addEventListener('dragend', function(event) {
+            if (draggedElement) {
+                draggedElement.style.opacity = '1';
+                draggedElement.classList.remove('dragging');
+            }
+
+            // 移除所有drag-over样式
+            document.querySelectorAll('.column-body').forEach(col => {
+                col.classList.remove('drag-over');
+            });
+        });
+    </script>
+</body>
+</html>

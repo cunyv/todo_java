@@ -13,13 +13,18 @@
         <header class="header">
             <div class="header-content">
                 <h1>📋 任务看板</h1>
-                <p>拖拽任务卡片来更新状态</p>
+                <p>欢迎回来，<span th:text="${currentUser.username}">用户</span>！拖拽任务卡片来更新状态</p>
             </div>
-            <div class="header-stats">
-                <div class="stat-item">
-                    <span class="stat-number" th:text="${totalCount}">0</span>
-                    <span class="stat-label">总任务</span>
+            <div class="header-right">
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <span class="stat-number" th:text="${totalCount}">0</span>
+                        <span class="stat-label">总任务</span>
+                    </div>
                 </div>
+                <form th:action="@{/logout}" method="post" class="logout-form">
+                    <button type="submit" class="btn-logout">退出登录</button>
+                </form>
             </div>
         </header>
 

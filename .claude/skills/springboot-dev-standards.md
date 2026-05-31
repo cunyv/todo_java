@@ -96,6 +96,126 @@ public class XxxController {
 }
 ```
 
+## 代码注释规范
+
+### JavaDoc 注释
+
+所有 public 类、接口、方法必须写 JavaDoc，说明用途、参数含义、返回值：
+
+```java
+/**
+ * 待办事项业务门面，负责待办相关的业务编排与 Entity/VO 转换。
+ */
+@Component
+@RequiredArgsConstructor
+public class TodoFacade {
+
+    /**
+     * 分页查询当前用户的待办列表。
+     *
+     * @param userId 用户 ID
+     * @param page   页码，从 1 开始
+     * @param size   每页条数
+     * @return 待办 VO 分页结果
+     */
+    public Page<TodoVO> getTodoPage(Long userId, int page, int size) {
+        // ...
+    }
+}
+```
+
+### 关键逻辑注释
+
+在以下位置必须写行内注释，帮助他人快速理解代码意图：
+
+- **业务规则**：为什么这样做，而非怎么做
+- **非显而易见的逻辑**：边界处理、兼容性处理、特殊分支
+- **复杂算法 / 状态流转**：每一步的含义
+- **外部依赖调用**：调用了什么、为什么调用
+
+```java
+public void processOrder(Long orderId) {
+    Order order = orderService.getById(orderId);
+
+    // 已完成的订单不允许重复处理
+    if (order.getStatus() == OrderStatus.COMPLETED) {
+        throw new BusinessException("订单已完成，不可重复处理");
+    }
+
+    // 扣减库存（需确保事务内执行，避免超卖）
+    stockService.deduct(order.getSkuId(), order.getQuantity());
+
+    // 订单状态流转：待支付 → 已支付 → 已发货
+    // 跳过已取消的订单，避免误操作
+    if (order.getStatus() != OrderStatus.CANCELLED) {
+        order.setStatus(OrderStatus.PAID);
+        orderService.updateById(order);
+    }
+}
+```
+
+### 禁止的注释
+
+```java
+// 错误：注释只是重复代码本身
+i++; // i 加 1
+
+// 错误：注释掉的代码残留
+// oldService.doSomething();
+// anotherOldCall();
+
+// 正确：注释说明"为什么"
+i++; // 跳过表头行
+```
+
+## 禁止魔法数字
+
+代码中严禁出现含义不明的数字字面量，必须使用枚举或常量替代。
+
+### 错误示例
+
+```java
+// 错误：魔法数字，无法直观理解含义
+if (order.getStatus() == 3) { ... }
+if (user.getRole() == 1) { ... }
+if (score >= 90) { ... }
+Thread.sleep(5000);
+```
+
+### 正确示例 — 使用枚举
+
+```java
+// 定义枚举
+@Getter
+@AllArgsConstructor
+public enum OrderStatus {
+    PENDING(0, "待支付"),
+    PAID(1, "已支付"),
+    SHIPPED(2, "已发货"),
+    COMPLETED(3, "已完成"),
+    CANCELLED(4, "已取消");
+
+    private final int code;
+    private final String displayName;
+}
+
+// 使用枚举
+if (order.getStatus() == OrderStatus.COMPLETED) { ... }
+```
+
+### 正确示例 — 使用常量
+
+对于不属于业务枚举的数值（如超时时间等），使用常量：
+
+```java
+public class AppConstants {
+    /** 请求超时时间（毫秒） */
+    public static final long REQUEST_TIMEOUT_MS = 5000L;
+
+    private AppConstants() {}
+}
+```
+
 ## MyBatis-Plus 规范
 
 ### Mapper
@@ -123,10 +243,14 @@ public class XxxServiceImpl extends ServiceImpl<XxxMapper, XxxEntity> implements
 
 ### 查询
 
-使用 `LambdaQueryWrapper`，禁止手写 SQL 字符串：
+根据查询复杂度选择不同方案：
+
+#### 简单查询 — LambdaQueryWrapper
+
+单表条件查询、排序、分页等简单场景，使用 `LambdaQueryWrapper`，禁止手写 SQL 字符串：
 
 ```java
-// 正确
+// 正确 — 简单条件查询
 xxxService.list(new LambdaQueryWrapper<XxxEntity>()
         .eq(XxxEntity::getUserId, userId)
         .orderByDesc(XxxEntity::getCreatedAt));
@@ -134,6 +258,72 @@ xxxService.list(new LambdaQueryWrapper<XxxEntity>()
 // 错误
 xxxMapper.selectList("SELECT * FROM xxx WHERE user_id = " + userId);
 ```
+
+#### 复杂查询 — XML Mapper
+
+多表 JOIN、子查询、聚合统计、动态 SQL 等复杂场景，使用 XML 方式，**返回对象必须是 VO**（禁止返回 Entity）：
+
+**1. Mapper 接口定义方法**
+
+```java
+@Mapper
+public interface XxxMapper extends BaseMapper<XxxEntity> {
+    List<XxxVO> selectXxxDetailList(@Param("query") XxxQueryDTO query);
+}
+```
+
+**2. XML 映射文件**（`src/main/resources/mapper/XxxMapper.xml`）
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.xxx.mapper.XxxMapper">
+
+    <select id="selectXxxDetailList" resultType="com.example.xxx.vo.XxxVO">
+        SELECT
+            a.id,
+            a.title,
+            b.name AS categoryName,
+            a.created_at
+        FROM xxx a
+        LEFT JOIN category b ON a.category_id = b.id
+        <where>
+            <if test="query.userId != null">
+                AND a.user_id = #{query.userId}
+            </if>
+            <if test="query.status != null">
+                AND a.status = #{query.status}
+            </if>
+        </where>
+        ORDER BY a.created_at DESC
+    </select>
+
+</mapper>
+```
+
+**3. 在 Facade 层调用**
+
+```java
+@Component
+@RequiredArgsConstructor
+public class XxxFacade {
+    private final XxxMapper xxxMapper;
+
+    public List<XxxVO> getXxxDetailList(XxxQueryDTO query) {
+        return xxxMapper.selectXxxDetailList(query);
+    }
+}
+```
+
+#### 选择原则
+
+| 场景 | 方案 | 说明 |
+|---|---|---|
+| 单表 CRUD、简单条件 | `LambdaQueryWrapper` | 类型安全，代码简洁 |
+| 多表 JOIN | XML Mapper → VO | SQL 可读性好，返回 VO |
+| 聚合统计（COUNT/SUM/GROUP BY） | XML Mapper → VO | 复杂 SQL 在 XML 中更清晰 |
+| 动态条件拼接（大量 `<if>`） | XML Mapper → VO | XML 动态 SQL 比 Wrapper 更易维护 |
 
 ## Sa-Token 规范
 
@@ -209,12 +399,11 @@ public class TodoCreateDTO {
 - 命名：`XxxVO`、`XxxStatsVO`
 - 包含前端展示所需的所有字段
 - 可包含派生字段（如 `statusDisplayName`）
-- 使用 `@Data @NoArgsConstructor @AllArgsConstructor`
+- 使用 `@Data @NoArgsConstructor`（禁止 `@AllArgsConstructor`）
 
 ```java
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class TodoVO {
     private Long id;
     private String title;
@@ -226,15 +415,49 @@ public class TodoVO {
 
 ### 转换
 
-Entity ↔ DTO/VO 转换在 **Facade 层**完成，Controller 不做转换：
+Entity ↔ DTO/VO 转换在 **Facade 层**完成，Controller 不做转换。禁止使用构造器转换。
+
+根据字段差异程度选择方式：
+
+#### 字段基本一致 — 对象拷贝
+
+当 Entity 和 VO 字段大部分相同、仅有少量额外字段时，先用 `BeanUtils.copyProperties` 拷贝，再补充差异字段：
 
 ```java
-// Facade 中
 private TodoVO toTodoVO(Todo todo) {
     if (todo == null) return null;
-    return new TodoVO(todo.getId(), todo.getTitle(), todo.getStatus(),
-                      todo.getStatus().getDisplayName(), todo.getCreatedAt());
+    // 同名字段批量拷贝
+    TodoVO vo = new TodoVO();
+    BeanUtils.copyProperties(todo, vo);
+    // 补充派生字段
+    vo.setStatusDisplayName(todo.getStatus().getDisplayName());
+    return vo;
 }
+```
+
+#### 字段差异较大 — setter 赋值
+
+当 Entity 和 VO 字段差异较多、或需要大量派生计算时，逐字段 setter 赋值更清晰：
+
+```java
+private TodoVO toTodoVO(Todo todo) {
+    if (todo == null) return null;
+    TodoVO vo = new TodoVO();
+    vo.setId(todo.getId());
+    vo.setTitle(todo.getTitle());
+    vo.setStatus(todo.getStatus());
+    vo.setStatusDisplayName(todo.getStatus().getDisplayName());
+    vo.setCreatedAt(todo.getCreatedAt());
+    return vo;
+}
+```
+
+#### 禁止的写法
+
+```java
+// 错误：构造器转换（字段多时顺序易错，且强制 VO 必须有 @AllArgsConstructor）
+return new TodoVO(todo.getId(), todo.getTitle(), todo.getStatus(),
+                  todo.getStatus().getDisplayName(), todo.getCreatedAt());
 ```
 
 ## 包结构模板

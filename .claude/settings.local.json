@@ -4,7 +4,12 @@
       "Bash(mkdir -p src/main/java/com/example/todo)",
       "Bash(mkdir -p src/main/resources/templates)",
       "Bash(mkdir -p src/main/resources/static)",
-      "Bash(mkdir -p src/test/java/com/example/todo)"
+      "Bash(mkdir -p src/test/java/com/example/todo)",
+      "Bash(mvn clean *)",
+      "Bash(mvn -version)",
+      "Bash(java -version)",
+      "Bash(/usr/libexec/java_home *)",
+      "Bash(JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home mvn clean *)"
     ]
   }
 }

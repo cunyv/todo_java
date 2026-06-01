@@ -9,12 +9,12 @@ description: Spring Boot 项目技术栈与编码规范，涵盖 MyBatis-Plus、
 
 | 项目 | 选型 | 说明 |
 |---|---|---|
-| 语言 | Java 11+ | |
-| 框架 | Spring Boot 2.7.x | |
+| 语言 | Java 21 | |
+| 框架 | Spring Boot 3.2.x | |
 | 模板引擎 | Thymeleaf | 服务端渲染 |
-| ORM | MyBatis-Plus 3.5.x | **禁止使用 JPA / Hibernate** |
-| 数据库 | MySQL 8.0 | 字符集 utf8mb4 |
-| 认证 | Sa-Token | **禁止使用 Spring Security** |
+| ORM | MyBatis-Plus 3.5.5（`mybatis-plus-spring-boot3-starter`） | **禁止使用 JPA / Hibernate** |
+| 数据库 | MySQL 8.0+ | 字符集 utf8mb4，驱动 `mysql-connector-j` |
+| 认证 | Sa-Token（`sa-token-spring-boot3-starter`） | **禁止使用 Spring Security** |
 | 工具库 | Lombok | 消除样板代码 |
 | 构建 | Maven | |
 
